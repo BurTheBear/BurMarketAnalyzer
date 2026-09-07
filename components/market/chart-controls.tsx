@@ -1,0 +1,10 @@
+'use client';
+import { useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
+import { Dialog,DialogContent,DialogTitle,DialogDescription } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
+import { CHART_STUDIES,DEFAULT_CHART_STUDIES } from '@/lib/engine/chart-options';
+export default function ChartControls({selected,onChange}:{selected:string[];onChange:(value:string[])=>void}) {
+ const [open,setOpen]=useState(false);
+ return <><div className="chart-legend"><button className="text-button" onClick={()=>setOpen(true)}><SlidersHorizontal size={15}/> Indicators <span className="version-badge">{selected.length} ON</span></button><span className="muted text-xs">{CHART_STUDIES.filter(s=>selected.includes(s.id)).map(s=>s.label).join(' · ')||'Price candles only'}</span></div><Dialog open={open} onOpenChange={setOpen}><DialogContent className="chart-settings-dialog"><DialogTitle>Chart indicators</DialogTitle><DialogDescription>Show the studies you want to compare. These visual choices do not change bur bot’s scoring formula. Values use completed candles.</DialogDescription>{[false,true].map(pane=><div key={String(pane)}><h3>{pane?'Separate indicator panels':'Price overlays & signals'}</h3><div className="indicator-switches">{CHART_STUDIES.filter(s=>s.pane===pane).map(s=><label key={s.id}><Switch size="sm" checked={selected.includes(s.id)} onCheckedChange={on=>onChange(on?[...selected,s.id]:selected.filter(id=>id!==s.id))}/>{s.label}</label>)}</div></div>)}<div className="flex gap-4"><button className="text-button" onClick={()=>onChange([...DEFAULT_CHART_STUDIES])}>Restore defaults</button><button className="text-button" onClick={()=>onChange([])}>Price only</button></div><p className="muted text-xs">Session VWAP starts at the first available candle in the UTC session. Daily pivots need a complete prior UTC day; unavailable values stay blank. Ichimoku spans are shown at their calculation time, without a projected cloud.</p></DialogContent></Dialog></>;
+}
