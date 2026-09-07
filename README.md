@@ -98,3 +98,11 @@ Automated tests cover indicator warmup, zero-variance cases, gaps, pattern recog
 Public Binance quotes and streaming depth and Coinbase candles were checked. The app matched a simultaneous Binance BTCUSDT bid/ask comparison within one cent. This point-in-time result is not a permanent accuracy guarantee. No actual Binance credentials were supplied during development, and no real orders were placed. Authenticated Binance trading still requires testing with the user's eligible account and API permissions. Yahoo returned 429 in this environment. The experimental strategy is not financially validated for real-money use.
 
 Provider references: [Binance Spot API](https://developers.binance.com/docs/binance-spot-api-docs), [Coinbase Exchange](https://docs.cdp.coinbase.com/exchange/docs), [Lightweight Charts](https://tradingview.github.io/lightweight-charts/), [Cloudflare R2](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/).
+
+## Decision verification and expanded markets
+
+The searchable coin picker loads current active Binance Spot USDT pairs from `/api/symbols`; it excludes other quote currencies, derivatives, and delisted markets. At most five market sessions run at once (four defaults plus the selected additional coin). Quantity suggestions use published exchange step sizes. New listings may have insufficient history. News coverage is incomplete, especially for smaller coins.
+
+The bot desk shows the exact completed-candle readings, eight score contributions, filter outcome, and raw indicator values. `/api/verify` independently fetches fresh Binance history using the same disclosed engine and returns downloadable candles plus a SHA-256 history fingerprint. This is calculation/source verification, not independent validation of prediction accuracy. New bot proposals persist their evidence; “Why this trade?” in order history retrieves it. Old/manual orders are explicitly distinguished.
+
+Trade popups contain Allow/Deny, destination, quantity, estimate, sample count, reference price, estimated cost/fees, and expiration. The Test notification preview has no underlying order. Below-threshold signals remain silent as configured.

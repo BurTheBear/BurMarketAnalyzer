@@ -1,6 +1,6 @@
 /** Canonical market contracts. Prices are quote currency; timestamps are UTC seconds. */
-export const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'] as const;
-export type Symbol = typeof SYMBOLS[number];
+export type Symbol = `${string}USDT`;
+export const SYMBOLS:readonly Symbol[] = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 export const INTERVALS = { '1m': 60, '5m': 300, '15m': 900 } as const;
 export type Interval = keyof typeof INTERVALS;
 export type Mode = 'replay' | 'live';
@@ -20,6 +20,6 @@ export function validBar(bar: Bar): boolean {
     && bar.high >= Math.max(bar.open, bar.close) && bar.low <= Math.min(bar.open, bar.close);
 }
 export function parseSubscription(symbol: string | null, interval: string | null): Subscription {
-  if (!SYMBOLS.includes(symbol as Symbol) || !Object.hasOwn(INTERVALS, interval ?? '')) throw new Error('Unsupported symbol or interval');
+  if (!symbol || !/^[A-Z0-9]{2,24}USDT$/.test(symbol) || !Object.hasOwn(INTERVALS, interval ?? '')) throw new Error('Unsupported symbol or interval');
   return { symbol: symbol as Symbol, interval: interval as Interval };
 }

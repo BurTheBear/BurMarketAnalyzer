@@ -4,9 +4,14 @@ export interface PaperAccount { cash: number; realized: number; fees: number; po
 // Quote balances use integer micro-USDT; quantities use 1e-8 base units. BigInt intermediates avoid multiplication loss.
 export const QUOTE = 1_000_000, BASE = 100_000_000;
 export const initialAccount = (): PaperAccount => ({ cash: 100_000 * QUOTE, realized: 0, fees: 0, positions: {} });
-export function quoteCost(price: number, units: number): number { return Number((BigInt(Math.round(price * QUOTE)) * BigInt(units) + BigInt(BASE / 2)) / BigInt(BASE)); }
+export function quoteCost(price: number, units: number): number {
+ if(!Number.isFinite(price)||price<=0||!Number.isSafeInteger(units)||units<0)throw new Error('Invalid price or quantity precision');
+ const scaled=BigInt(price.toFixed(12).replace('.','')),denominator=BigInt(BASE)*BigInt('1000000000000');
+ const result=Number((scaled*BigInt(units)*BigInt(QUOTE)+denominator/BigInt(2))/denominator);
+ if(!Number.isSafeInteger(result))throw new Error('Order exceeds supported accounting limits');return result;
+}
 export function simulateFill(book: Book, side: 'BUY'|'SELL', quantity: number) {
-  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100000) throw new Error('Invalid order quantity');
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000000) throw new Error('Invalid order quantity');
   if (Date.now() - book.time > 5000) throw new Error('Market quote is stale');
   let remaining = Math.round(quantity * BASE), cost = 0; const units = remaining;
   for (const [price, size] of side === 'BUY' ? book.asks : book.bids) {
@@ -22,7 +27,7 @@ export function applyFill(account: PaperAccount, symbol: Symbol, side: 'BUY'|'SE
   const next = structuredClone(account), position = next.positions[symbol] ?? { quantity: 0, cost: 0 };
   if (side === 'BUY') {
     if (fill.cost + fill.fee > next.cash) throw new Error('Insufficient paper cash');
-    next.cash -= fill.cost + fill.fee; position.quantity += fill.units; position.cost += fill.cost + fill.fee;
+    next.cash -= fill.cost + fill.fee; if(!Number.isSafeInteger(position.quantity+fill.units))throw new Error('Position exceeds supported quantity precision');position.quantity += fill.units; position.cost += fill.cost + fill.fee;
   } else {
     if (position.quantity < fill.units) throw new Error('Insufficient holdings. Spot SELL orders close owned inventory.');
     const allocated = Number(BigInt(position.cost) * BigInt(fill.units) / BigInt(position.quantity));

@@ -4,8 +4,7 @@ import { db } from './store';
 import { vaultKey, vaultReady } from './vault';
 import { initialAccount, applyFill, simulateFill, QUOTE, type PaperAccount } from './paper';
 import { liveBook, seal, unseal, signed, validateQuantity, ExchangeError, type Credentials, type ExchangeAccount } from './exchange';
-import { Pipeline } from '../engine/pipeline';
-import { BinanceConnector } from '../market/binance';
+import { verifyBinance } from '../engine/verify';
 import { parseSubscription, type Symbol } from '../market/types';
 import type { Proposal, Target } from './types';
 interface AccountRow { user_id: string; data: string; version: number; halted: number }
@@ -53,13 +52,14 @@ export async function propose(user:string,input:{symbol:string;interval:string;s
  const r=parseSubscription(input.symbol,input.interval);if(input.target!=='paper'&&input.target!=='binance')throw new Error('Invalid trading destination');
  const target=input.target as Target;
  if(input.side!=='BUY'&&input.side!=='SELL')throw new Error('Invalid order side');
- if(!Number.isFinite(input.quantity)||input.quantity<=0||input.quantity>100000)throw new Error('Invalid quantity');
- const a=await checkLimits(user,target);let side=input.side as 'BUY'|'SELL',reason='Manual spot market order',estimate;
+ if(!Number.isFinite(input.quantity)||input.quantity<=0||input.quantity>10000000)throw new Error('Invalid quantity');
+ const a=await checkLimits(user,target);let side=input.side as 'BUY'|'SELL',reason='Manual spot market order',estimate,evidence;
  if(input.bot){
   const gate=newsGate(await news(),r.symbol);if(!gate.allowed)throw new Error(gate.reason);
-  const bars=await new BinanceConnector().history(r);const p=new Pipeline(r,'live');bars.filter(b=>b.closed).forEach(b=>p.push(b));const s=p.snapshot().signal;
-  if(!s||s.action==='HOLD')throw new Error('The bot is holding. No trade is proposed until the factors align.');
-  const parameters=input.parameters??DEFAULT_BOT_PARAMETERS;if(!validBotParameters(parameters))throw new Error('Invalid bot parameters');const eligibility=botEligibility(s,parameters);if(!eligibility.allowed)throw new Error(eligibility.reason);
+  const parameters=input.parameters??DEFAULT_BOT_PARAMETERS;if(!validBotParameters(parameters))throw new Error('Invalid bot parameters');
+  const verified=await verifyBinance(r,parameters);const s=verified.evidence.signal;
+  const eligibility=botEligibility(s,parameters);if(!eligibility.allowed||s.action==='HOLD')throw new Error(eligibility.reason);
+  evidence=verified.evidence;
   side=s.action;estimate=s.estimate;reason=`Bur Confluence v2: ${s.score.toFixed(1)} score on the last completed ${r.interval} candle.`;
  }
  const book=await liveBook(r.symbol),fill=simulateFill(book,side,input.quantity);
@@ -67,7 +67,7 @@ export async function propose(user:string,input:{symbol:string;interval:string;s
  await validateQuantity(r.symbol,input.quantity,fill.price);
  if(target==='paper')applyFill(JSON.parse(a.data),r.symbol,side,fill);
  const id=`bur${crypto.randomUUID().replaceAll('-','')}`;
- const proposal:Proposal={id,symbol:r.symbol,side,quantity:input.quantity,target,referencePrice:fill.price,estimatedNotional:fill.cost/QUOTE,estimatedFee:fill.fee/QUOTE,maxSlippage:.005,expiresAt:Date.now()+30000,bot:!!input.bot,reason,estimate,status:'PENDING'};
+ const proposal:Proposal={id,symbol:r.symbol,side,quantity:input.quantity,target,referencePrice:fill.price,estimatedNotional:fill.cost/QUOTE,estimatedFee:fill.fee/QUOTE,maxSlippage:.005,expiresAt:Date.now()+30000,bot:!!input.bot,reason,estimate,evidence,status:'PENDING'};
  // One outstanding proposal per user; old approvals cannot later execute unexpectedly.
  await db().batch([db().prepare("UPDATE orders SET status='CANCELLED' WHERE user_id=? AND status='PENDING'").bind(user),db().prepare('INSERT INTO orders (id,user_id,target,status,data,created_at,expires_at) VALUES (?,?,?,?,?,?,?)').bind(id,user,target,'PENDING',JSON.stringify(proposal),Date.now(),proposal.expiresAt)]);
  return proposal;

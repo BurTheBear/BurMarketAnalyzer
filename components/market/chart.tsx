@@ -29,7 +29,7 @@ export default function MarketChart({snapshot,selected}:{snapshot?:Snapshot;sele
   return()=>{window.removeEventListener('bur-theme',applyTheme);chart.remove();state.current=null;};
  },[snapshot?.symbol,snapshot?.interval,snapshot?.mode,snapshot?.source,signature,height]);
  useEffect(()=>{
-  const s=state.current;if(!s||!snapshot?.points.length)return;
+  const s=state.current;if(!s||!snapshot?.points.length)return;const price=snapshot.current?.close??snapshot.points.at(-1)!.bar.close;const precision=price<1?8:price<10?4:2;s.candle.applyOptions({priceFormat:{type:'price',precision,minMove:10**-precision}});
   for(const point of snapshot.points.filter(p=>p.bar.time>s.last)){
    const time=point.bar.time as UTCTimestamp;s.candle.update({...point.bar,time});s.volume?.update({time,value:point.bar.volume,color:point.bar.close>=point.bar.open?'#8a9b7888':'#a66e5388'});
    for(const line of s.lines){const value=line.value(point);if(value!==null&&Number.isFinite(value))line.series.update({time,value});else line.series.update({time});}

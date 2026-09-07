@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   try {
     let job = inFlight.get(key);
     if (!job) { job = new BinanceConnector().history(subscription); inFlight.set(key, job); }
-    const bars = await job; cache.set(key, { bars, expires: Date.now() + 5000 });
+    const bars = await job; if(cache.size>=100)cache.delete(cache.keys().next().value!);cache.set(key, { bars, expires: Date.now() + 5000 });
     return Response.json(bars, { headers: { 'Cache-Control': 'private, max-age=5' } });
   } catch { return Response.json({ error: 'Provider unavailable; select replay or retry later.' }, { status: 502, headers: { 'Retry-After': '10' } }); }
   finally { inFlight.delete(key); }
